@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Recipe Box</title>
+  <meta name="description" content="A personal recipe collection stored in your own Google Drive.">
+  <meta name="theme-color" content="#B4472A">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Recipes">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to recipes</a>
+
+  <!-- Global loading indicators (shown during every Google API call) -->
+  <div id="progress" class="progress" hidden><div class="progress-bar"></div></div>
+  <div id="busy-pill" class="busy-pill" hidden>
+    <span class="spinner" aria-hidden="true"></span>
+    <span id="busy-label">Working…</span>
+  </div>
+  <div id="status" class="sr-only" role="status" aria-live="polite"></div>
+
+  <!-- ===== Sign-in screen ===== -->
+  <section id="signin-screen" class="signin" aria-labelledby="signin-title">
+    <div class="signin-card">
+      <img class="signin-logo" src="icons/icon.svg" alt="" width="88" height="88">
+      <h1 id="signin-title">Recipe Box</h1>
+      <p class="signin-tagline">Your recipes, kept in your own Google Drive. Each recipe is a Google Doc you can open and edit anywhere.</p>
+
+      <div id="config-notice" class="notice notice-warn" role="alert" hidden>
+        <strong>Setup needed.</strong> No Google OAuth Client ID has been added yet.
+        Open <code>config.js</code> and paste yours in. The README explains how to get one.
+      </div>
+
+      <div id="signin-error" class="notice notice-error" role="alert" hidden></div>
+
+      <div class="signin-actions">
+        <button id="continue-btn" class="btn btn-primary btn-lg" type="button" hidden></button>
+        <button id="signin-btn" class="btn btn-primary btn-lg" type="button">
+          <svg class="g-logo" viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.2C12.4 13.7 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.2 5.5-4.7 7.2l7.6 5.9c4.4-4.1 6.9-10.1 6.9-17.6z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.2C.9 16.5 0 20.1 0 24s.9 7.5 2.6 10.8l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.2-13.5-9.9l-7.9 6.2C6.5 42.6 14.6 48 24 48z"/></svg>
+          <span id="signin-btn-label">Sign in with Google</span>
+        </button>
+      </div>
+
+      <p class="signin-fineprint">Recipe Box can only see the files it creates itself. It cannot read anything else in your Drive.</p>
+    </div>
+  </section>
+
+  <!-- ===== Main app ===== -->
+  <div id="app" hidden>
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="brand">
+          <img src="icons/icon.svg" alt="" width="32" height="32">
+          <span class="brand-name">Recipe Box</span>
+        </div>
+        <div class="header-actions">
+          <button id="refresh-btn" class="icon-btn" type="button" aria-label="Refresh recipes" title="Refresh recipes">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20 11a8 8 0 1 0-2.3 6.3M20 4v7h-7"/></svg>
+            <span class="icon-btn-text">Refresh</span>
+          </button>
+          <div class="account">
+            <button id="account-btn" class="account-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="account-menu">
+              <span id="avatar" class="avatar" aria-hidden="true"></span>
+              <span id="account-email" class="account-email"></span>
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div id="account-menu" class="menu account-menu" hidden>
+              <p class="menu-label">Signed in as</p>
+              <p id="account-menu-name" class="menu-name"></p>
+              <p id="account-menu-email" class="menu-email"></p>
+              <button id="switch-btn" class="menu-item" type="button">Switch account</button>
+              <button id="signout-btn" class="menu-item" type="button">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div id="reauth-banner" class="banner" role="alert" hidden>
+      <span>Your Google session has expired.</span>
+      <button id="reauth-btn" class="btn btn-small" type="button">Reconnect</button>
+    </div>
+
+    <main id="main" tabindex="-1">
+      <section class="search-section" aria-label="Search and filter">
+        <div class="search-box">
+          <label for="search-input" class="sr-only">Search recipes</label>
+          <svg class="search-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="search-input" type="search" placeholder="Search titles and tags…" autocomplete="off" enterkeyhint="search">
+        </div>
+        <label class="switch" for="deep-toggle">
+          <input id="deep-toggle" type="checkbox" role="switch">
+          <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
+          <span>Search inside recipes</span>
+        </label>
+        <p id="deep-hint" class="hint" hidden>Searching the full text of your recipe Docs. Newly edited text can take a minute to become searchable.</p>
+
+        <div id="filters" class="filters" hidden>
+          <div class="filters-head">
+            <h2>Filter by tag</h2>
+            <button id="clear-filters-btn" class="link-btn" type="button" hidden>Clear filters</button>
+          </div>
+          <div id="chip-groups"></div>
+        </div>
+      </section>
+
+      <section aria-label="Recipes">
+        <div class="list-toolbar">
+          <p id="result-count" class="result-count" aria-live="polite"></p>
+          <label class="sort">
+            <span>Sort</span>
+            <select id="sort-select">
+              <option value="title">A–Z</option>
+              <option value="updated">Recently updated</option>
+            </select>
+          </label>
+        </div>
+        <ul id="recipe-list" class="recipe-grid"></ul>
+        <div id="empty-state" class="empty-state" hidden></div>
+      </section>
+    </main>
+
+    <button id="add-btn" class="fab" type="button" aria-label="Add a new recipe" title="Add a new recipe">
+      <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <!-- ===== Add / edit recipe dialog ===== -->
+  <dialog id="recipe-dialog" class="dialog" aria-labelledby="recipe-dialog-title">
+    <form id="recipe-form" novalidate>
+      <h2 id="recipe-dialog-title">New recipe</h2>
+      <div class="field">
+        <label for="title-input">Title</label>
+        <input id="title-input" type="text" required maxlength="200" autocomplete="off" aria-describedby="title-error">
+        <p id="title-error" class="field-error" hidden>Please give the recipe a title.</p>
+      </div>
+      <div id="tag-fields"></div>
+      <p class="hint">Type a tag and press Enter or comma to add it. Tags are saved in lowercase.</p>
+      <div id="form-error" class="notice notice-error" role="alert" hidden></div>
+      <div class="dialog-actions">
+        <button id="form-cancel" class="btn" type="button">Cancel</button>
+        <button id="form-save" class="btn btn-primary" type="submit">Save recipe</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ===== Delete confirmation dialog ===== -->
+  <dialog id="confirm-dialog" class="dialog dialog-small" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+    <h2 id="confirm-title">Delete recipe?</h2>
+    <p id="confirm-text"></p>
+    <div id="confirm-error" class="notice notice-error" role="alert" hidden></div>
+    <div class="dialog-actions">
+      <button id="confirm-cancel" class="btn" type="button">Cancel</button>
+      <button id="confirm-ok" class="btn btn-danger" type="button">Delete</button>
+    </div>
+  </dialog>
+
+  <div id="toasts" class="toasts"></div>
+
+  <noscript><p class="noscript">Recipe Box needs JavaScript to talk to Google Drive.</p></noscript>
+
+  <script src="config.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
