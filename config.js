@@ -9,5 +9,5 @@
 // Never put a client secret or API key in this project. It doesn't need one.
 
 window.RECIPE_BOX_CONFIG = {
-  CLIENT_ID: 'HenryNg506.apps.googleusercontent.com',
+  CLIENT_ID: '952909709683-ao6oe9utj10705ku951bl69copbgsbam.apps.googleusercontent.com',
 };
